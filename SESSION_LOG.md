@@ -6,6 +6,55 @@
 
 ---
 
+## SESSION-095 — 2026-10-31 — Active Tenant Backfill Guard
+
+**Agent:** GitHub Copilot
+
+**Trigger:** Close the active-tenant guard gap found during the P1-04
+financial minor-unit backfill audit.
+
+- Backfill now verifies the workspace document exists and is active using a
+  server read before starting, then rechecks tenant activity inside every
+  Firestore transaction before companion-only writes.
+- Transaction pages are capped at 100 documents (101 reads including the
+  tenant record), below Firestore's transaction-size ceiling. Regressions
+  cover missing/inactive tenant documents, the page-size boundary, and a
+  fake-Firestore transaction that recomputes from current values while
+  preserving legacy fields.
+- RED: the new utility test failed to compile because the active-tenant
+  validator did not exist. GREEN: focused migration/provider suite:
+  `00:00 +21: All tests passed!`; full Flutter suite:
+  `02:05 +841: All tests passed!`; `flutter analyze lib --no-pub`:
+  `No issues found! (ran in 15.5s)`; `dart analyze test/`:
+  `No issues found!`.
+- No Rules/indexes changed. Production financial data was not read or
+  written. Hot restart was attempted, but the connected Dart Tooling Daemon
+  had no active Flutter app. No release/build, deployment, device delivery,
+  commit, or push was performed.
+
+## SESSION-094 — 2026-10-31 — P1-04 Backfill Safety
+
+**Agent:** GitHub Copilot
+
+**Trigger:** Continue the staged minor-unit migration without modifying
+production financial data or enabling strict Rules cutover.
+
+- Added a clean, same-tenant preview-plan requirement to the backfill API.
+  Each tenant-scoped page is re-read and recomputed in one Firestore
+  transaction before companion-only writes, so a concurrent legacy-value
+  update cannot leave stale minor-unit companions.
+- Added unit and provider regressions for dirty/mismatched plans and exact
+  companion matching. The RED tests first failed because the validation API
+  and required backfill plan did not exist.
+- Focused migration and backup-screen suite:
+  `00:07 +22: All tests passed!`; `flutter analyze lib --no-pub`:
+  `No issues found! (ran in 49.6s)`; `dart analyze test/`:
+  `No issues found!`.
+- No Rules/indexes changed. The plan gate is not a security boundary.
+  Production financial data was not read or written; strict cutover, release
+  build, deployment, install, commit, and push remain unperformed. P1-04
+  remains blocked on reconciliation and compatible-client rollout evidence.
+
 ## SESSION-093 — 2026-10-31 — Tenant Record Archive Listing
 
 **Agent:** GitHub Copilot

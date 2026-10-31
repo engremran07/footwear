@@ -1,6 +1,9 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:footwear_erp/core/constants/collections.dart';
+import 'package:footwear_erp/core/utils/financial_minor_unit_migration.dart';
 import 'package:footwear_erp/models/user_model.dart';
 import 'package:footwear_erp/providers/auth_provider.dart';
 import 'package:footwear_erp/providers/database_backup_provider.dart';
@@ -70,6 +73,7 @@ void main() {
   });
 
   test('denies sellers and platform super-admins', () async {
+    final cleanPlan = _plan();
     for (final role in [UserRole.seller, UserRole.superAdmin]) {
       final user = _user(role: role, now: now);
       final container = _container(user);
@@ -86,19 +90,133 @@ void main() {
       await expectLater(
         container
             .read(databaseBackupProvider.notifier)
-            .backfillFinancialMinorUnits(),
+            .backfillFinancialMinorUnits(plan: cleanPlan),
         throwsStateError,
       );
     }
   });
+
+  test('administrator backfill rejects a preview with exceptions', () async {
+    final user = _user(role: UserRole.admin, now: now);
+    final container = _container(user);
+    addTearDown(container.dispose);
+    final authSubscription = container.listen(authUserProvider, (_, _) {});
+    addTearDown(authSubscription.close);
+    final blockedPlan = FinancialMinorUnitMigration.preview(
+      tenantId: 'tenant-1',
+      collections: {
+        'shops': [
+          {'__id': 'shop-1', 'tenant_id': 'tenant-1', 'balance': 4.251},
+        ],
+        'transactions': <Map<String, dynamic>>[],
+        'invoices': <Map<String, dynamic>>[],
+      },
+    );
+
+    await expectLater(
+      container
+          .read(databaseBackupProvider.notifier)
+          .backfillFinancialMinorUnits(plan: blockedPlan),
+      throwsStateError,
+    );
+  });
+
+  test(
+    'financial backfill limits transactional pages to 100 documents',
+    () async {
+      final container = _container(_user(role: UserRole.admin, now: now));
+      addTearDown(container.dispose);
+      final authSubscription = container.listen(authUserProvider, (_, _) {});
+      addTearDown(authSubscription.close);
+
+      await expectLater(
+        container
+            .read(databaseBackupProvider.notifier)
+            .backfillFinancialMinorUnits(plan: _plan(), pageSize: 101),
+        throwsArgumentError,
+      );
+    },
+  );
+
+  test(
+    'backfill transaction uses current values and preserves legacy fields',
+    () async {
+      final firestore = FakeFirebaseFirestore();
+      await firestore.collection(Collections.tenants).doc('tenant-1').set({
+        'active': true,
+      });
+      await firestore.collection(Collections.shops).doc('shop-1').set({
+        'tenant_id': 'tenant-1',
+        'balance': 14.25,
+        'financial_minor_units': {'balance': 999},
+      });
+      final container = _container(
+        _user(role: UserRole.admin, now: now),
+        firestore: firestore,
+      );
+      addTearDown(container.dispose);
+      final authSubscription = container.listen(authUserProvider, (_, _) {});
+      addTearDown(authSubscription.close);
+
+      final updatedCount = await container
+          .read(databaseBackupProvider.notifier)
+          .backfillFinancialMinorUnits(plan: _plan(), pageSize: 1);
+      final shop = await firestore
+          .collection(Collections.shops)
+          .doc('shop-1')
+          .get();
+
+      expect(updatedCount, 1);
+      expect(shop.data()?['balance'], 14.25);
+      expect(shop.data()?['financial_minor_units'], {'balance': 1425});
+    },
+  );
+
+  test(
+    'backfill rejects an inactive workspace before changing records',
+    () async {
+      final firestore = FakeFirebaseFirestore();
+      await firestore.collection(Collections.tenants).doc('tenant-1').set({
+        'active': false,
+      });
+      await firestore.collection(Collections.shops).doc('shop-1').set({
+        'tenant_id': 'tenant-1',
+        'balance': 12.5,
+      });
+      final container = _container(
+        _user(role: UserRole.admin, now: now),
+        firestore: firestore,
+      );
+      addTearDown(container.dispose);
+      final authSubscription = container.listen(authUserProvider, (_, _) {});
+      addTearDown(authSubscription.close);
+
+      await expectLater(
+        container
+            .read(databaseBackupProvider.notifier)
+            .backfillFinancialMinorUnits(plan: _plan(), pageSize: 1),
+        throwsStateError,
+      );
+      final shop = await firestore
+          .collection(Collections.shops)
+          .doc('shop-1')
+          .get();
+
+      expect(shop.data()?['balance'], 12.5);
+      expect(shop.data(), isNot(contains('financial_minor_units')));
+    },
+  );
 }
 
-ProviderContainer _container(UserModel user) => ProviderContainer(
-  overrides: [
-    authUserProvider.overrideWith((ref) => Stream.value(user)),
-    databaseBackupProvider.overrideWith(_PreviewNotifier.new),
-  ],
-);
+ProviderContainer _container(UserModel user, {FirebaseFirestore? firestore}) =>
+    ProviderContainer(
+      overrides: [
+        authUserProvider.overrideWith((ref) => Stream.value(user)),
+        if (firestore != null)
+          databaseBackupFirestoreProvider.overrideWithValue(firestore),
+        databaseBackupProvider.overrideWith(_PreviewNotifier.new),
+      ],
+    );
 
 UserModel _user({required UserRole role, required Timestamp now}) => UserModel(
   id: 'user-1',
@@ -129,6 +247,17 @@ BackupPreview _backup({
   counts: counts,
   checksumOk: checksumOk,
   rawData: {
+    'shops': [
+      {'__id': 'shop-1', 'tenant_id': 'tenant-1', 'balance': 12.5},
+    ],
+    'transactions': <Map<String, dynamic>>[],
+    'invoices': <Map<String, dynamic>>[],
+  },
+);
+
+FinancialMinorUnitMigrationPlan _plan() => FinancialMinorUnitMigration.preview(
+  tenantId: 'tenant-1',
+  collections: {
     'shops': [
       {'__id': 'shop-1', 'tenant_id': 'tenant-1', 'balance': 12.5},
     ],

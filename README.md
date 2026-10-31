@@ -133,12 +133,16 @@ identifiers remain unchanged.
 A staged integer minor-unit compatibility layer now dual-reads and dual-writes
 the optional `financial_minor_units` companion map for shop, transaction, and
 invoice financial fields while preserving existing legacy values. A verified,
-tenant-scoped backup preview and bounded admin backfill API are available;
-the backfill changes companion fields only and has not been run. Legacy doubles
-remain authoritative for compatibility, Firestore Rules do not yet require
-minor-unit values, and historical reconciliation plus the client rollout and
-strict cutover remain unresolved. No production migration is represented by
-this local work. Firestore Rules/indexes were subsequently deployed after
+tenant-scoped backup preview and bounded admin backfill API are available.
+Backfill requires a clean plan from that preview and re-reads/recomputes each
+page transactionally before changing companion fields only. It verifies the
+workspace is active from the server and rechecks that state inside each
+transaction; transaction pages are capped at 100 documents. It has not been
+run. These app-side checks do not replace Firestore authorization. Legacy
+doubles remain authoritative for compatibility, Firestore Rules do not yet
+require minor-unit values, and historical reconciliation plus the client
+rollout and strict cutover remain unresolved. No production migration is
+represented by this local work. Firestore Rules/indexes were subsequently deployed after
 `207 passing (56s)` in the Rules Emulator; this deployment does not include
 Hosting or an app release. The user reports that invoice creation, non-stock
 sales, and cash receipts now succeed for admin, supervisor, and seller on the

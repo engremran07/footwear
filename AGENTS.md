@@ -658,6 +658,28 @@ and never replace provider or Firestore authorization.
 
 ## 10) Current Audit Status
 
+2026-10-31 P1-04 backfill safety — local, unreleased:
+
+- The companion backfill now requires a clean plan from the active workspace's
+  verified-backup preview. Each document page is re-read and recomputed inside
+  a Firestore transaction before companion-only updates, preventing stale query
+  snapshots from writing companions that disagree with current legacy values.
+  The provider also verifies the tenant is active from the server and inside
+  every transaction. Pages default to and are capped at 100 documents to stay
+  within Firestore transaction size limits.
+- A FakeFirebaseFirestore provider regression verifies current-value
+  recomputation, companion-only updates, and that inactive workspaces receive
+  no writes. Focused migration/provider suite: `00:00 +21: All tests passed!`;
+  full Flutter suite: `02:05 +841: All tests passed!`;
+  `flutter analyze lib --no-pub`: `No issues found! (ran in 15.5s)`;
+  `dart analyze test/`: `No issues found!`. Hot restart was attempted, but
+  the connected Dart Tooling Daemon had no active app.
+- This guard is app workflow validation, not a Firestore authorization
+  boundary. No Rules/indexes changed; production preview/backfill, strict
+  integer cutover, release build, deployment, device delivery, commit, and
+  push were not performed. P1-04 remains blocked on financial reconciliation
+  and compatible-client rollout evidence.
+
 2026-10-30 supervisor History and Seller Report access — local, unreleased:
 
 - History now grants tenant-wide scope to active authorized supervisors while

@@ -46,6 +46,21 @@
   have not been performed for this change. Permanent purge remains an explicit
   design/security blocker rather than a completed requirement.
 
+## Scope-Specific Addendum — 2026-10-31 P1-04 Backfill Safety
+
+- The local companion backfill now requires a clean plan produced from a
+  verified, same-workspace backup preview. Each page is re-read and recomputed
+  in a Firestore transaction before companion-only updates, so concurrent
+  changes cannot leave a companion calculated from an old query snapshot.
+- Focused migration and backup-screen suite: `00:07 +22: All tests passed!`;
+  `flutter analyze lib --no-pub`: `No issues found! (ran in 49.6s)`;
+  `dart analyze test/`: `No issues found!`.
+- The plan check is client-side workflow validation, not Rules authorization.
+  No Rules/indexes changed. No production financial data was read or written,
+  and no release/deployment/device/Git operation was performed. P1-04 remains
+  open: backup/reconciliation review, compatible-client rollout, exact Rules
+  arithmetic, and strict cutover are not proven.
+
 ## Scope-Specific Addendum — 2026-10-30 Workspace Feedback and CI Gate 14
 
 - Fixed verified local feedback issues: workspace provisioning no longer
@@ -468,7 +483,7 @@ client-side checks are explicitly separated from Firestore Rules enforcement.
 | P1-01: seller stock-sale Rules access-call budget | Not reproduced in tested range | Emulator coverage exercises 30-line sales and sampled counts of 5, 10, 15, 20, and 30. There is no declared maximum or proof for more than 30 lines, so unbounded cart size remains unverified. |
 | P1-02: settlement ignores credit notes | Fixed | `markAsPaid` settles the remaining amount after receipts and credits; credit-note writes update the original outstanding amount/status atomically. `mark_paid_outstanding_test.dart` covers credit-aware settlement. |
 | P1-03: cash-entry retries can duplicate writes | Fixed for supported client flow | Standalone cash entries use a caller-stable idempotency key, deterministic tenant-scoped document ID, and Firestore transaction. The 20-second wrapper timeout was removed; delayed-network behavior was not fault-injected. |
-| P1-04: money uses doubles and tolerance comparisons | Compatibility stage implemented locally; strict migration deferred | Shop, transaction, and invoice models/providers now support optional `financial_minor_units` companions with legacy fallback and atomic dual-writes. A verified backup preview and bounded tenant-scoped companion backfill are available but have not been run. Existing doubles and Rules tolerances remain authoritative; historical reconciliation, backup/client rollout, exact Rules enforcement, and strict cutover are unresolved. |
+| P1-04: money uses doubles and tolerance comparisons | Compatibility stage implemented locally; strict migration deferred | Shop, transaction, and invoice models/providers support optional `financial_minor_units` companions with legacy fallback and atomic dual-writes. Backfill requires a clean same-tenant verified-backup plan and transactionally recomputes each page before companion-only writes; it has not been run. Existing doubles and Rules tolerances remain authoritative; historical reconciliation, backup/client rollout, exact Rules enforcement, and strict cutover are unresolved. |
 | P2-01: seller cash receipts do not notify admins | Fixed in current client/Rules | Receipt creation writes a linked `cash_in` invoice notification after its financial transaction; Rules accept only a matching cash-receipt invoice. Notification delivery remains best-effort and logged. |
 | P2-02: amount caps are inconsistent and currency-agnostic | Partially fixed; currency policy remains unresolved | Local providers and Rules now apply the established `999999.99` ceiling to sale/credit invoices, receipts, standalone cash, seller edit requests, and corrections. SAR and PKR share the same provisional ceiling; no currency-specific business limits have been approved. |
 | P2-03: ambiguous precision and sub-cent input | Fixed at parser/provider boundaries | `1.500` is rejected while supported grouping such as `1,500` remains valid; changed financial provider inputs reject more than two decimals. The broader server/double residual is tracked under P1-04. |
@@ -534,15 +549,25 @@ client-side checks are explicitly separated from Firestore Rules enforcement.
   amounts.
 - The backup preview validates a verified same-tenant workspace archive and
   reports malformed, sub-cent, duplicate, or cross-tenant records. The
-  admin-only backfill is document-ID paged (100 by default, maximum 400),
-  tenant-scoped, idempotent, and updates companion fields only. A shared
-  mapping translates the legacy Firestore `customers` path to migration key
-  `shops`. No production backup preview or backfill was run.
+  admin-only backfill is document-ID paged (100 maximum), tenant-scoped,
+  idempotent, checks the active tenant from the server and again inside each
+  transaction, and updates companion fields only. The bounded transaction
+  page avoids Firestore's transaction-size ceiling. A shared mapping
+  translates the legacy Firestore `customers` path to migration key `shops`.
+  No production backup preview or backfill was run.
 - Local Rules permit optional staged companions, including companion-only
   backfill writes, while keeping older-client writes possible. They do not
   yet require companions, validate every representation pair, or enforce
   exact minor-unit balance deltas. Existing doubles and tolerance checks
   remain authoritative; this compatibility code is not a strict migration.
+- Follow-up regression verification: focused suite
+  `00:00 +21: All tests passed!`; full Flutter suite:
+  `02:05 +841: All tests passed!`; `flutter analyze lib --no-pub`:
+  `No issues found! (ran in 15.5s)`; `dart analyze test/`:
+  `No issues found!`. The provider checks active tenant state from the server
+  and within every backfill transaction; transaction pages are capped at 100.
+  Hot restart was unavailable because the connected Dart Tooling Daemon had
+  no active app.
 - Final local verification after the mapping regression: focused Flutter suite
   `00:08 +137: All tests passed!`; Rules Emulator `204 passing (1m)` with
   `EMULATOR_EXIT: 0`; `flutter analyze lib --no-pub`:

@@ -665,11 +665,15 @@ must not be described as a release or production signoff.
   only companions consistent with legacy values; providers write companions
   atomically beside existing financial updates, and backup restore regenerates
   companions without changing the legacy values. A tenant-scoped backup
-  preview and bounded admin backfill API are available, but neither a
-  production preview nor a backfill was executed. Backfill updates companion
-  fields only, defaults to 100 documents per page, and caps page size at 400.
-  Firestore Rules allow staged writes but do not yet require integer
-  companions or exact minor-unit arithmetic. Focused suite:
+  preview and bounded admin backfill API are available. Backfill requires a
+  clean plan from the verified-backup preview, verifies the active tenant
+  from the server and again inside each Firestore transaction, and updates
+  companion fields only. Transaction pages default to and are capped at 100
+  documents to stay within Firestore transaction size limits. These app-side
+  checks are not a Rules authorization boundary; neither a production preview
+  nor a backfill was executed. Firestore Rules allow staged writes but do not
+  yet require integer companions or exact minor-unit arithmetic.
+  Focused suite:
   `00:08 +137: All tests passed!`; Rules Emulator: `204 passing (1m)`;
   `flutter analyze lib --no-pub`: `No issues found! (ran in 108.8s)`;
   `dart analyze test/`: `No issues found!`. Firestore Rules/indexes were
@@ -677,6 +681,12 @@ must not be described as a release or production signoff.
   Firebase reported `Deploy complete!`. No production data migration,
   Hosting deployment, app release/build, device delivery, commit, or push
   occurred. P1-04 remains open.
+- Follow-up active-tenant and transaction-page regressions:
+  `00:00 +21: All tests passed!`; full Flutter suite:
+  `02:05 +841: All tests passed!`; `flutter analyze lib --no-pub`:
+  `No issues found! (ran in 15.5s)`; `dart analyze test/`:
+  `No issues found!`. Hot restart was attempted, but no app was registered
+  with the connected Dart Tooling Daemon.
 - After that Rules deployment, the user reports successful invoice creation,
   non-stock sales, and cash receipts for admin, supervisor, and seller on the
   designated `Testing` route / `owerty` test shop. This supports the shared

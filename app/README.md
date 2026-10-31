@@ -734,13 +734,17 @@ The local staged minor-unit compatibility layer adds optional
 `financial_minor_units` companions for shop, transaction, and invoice monetary
 fields. Models trust a companion only when it matches the preserved legacy
 value; provider writes update both representations atomically, and backup
-restore regenerates companions without rewriting legacy values. An
-administrator-only, tenant-scoped preview and bounded backfill API are
-available. Backfill updates companions only and has not been run. Legacy
-doubles remain authoritative for compatibility, Rules do not yet enforce
-integer arithmetic, and historical reconciliation, client rollout, and strict
-cutover remain unresolved. This is local implementation, not a production
-migration or release.
+restore regenerates companions without rewriting legacy values. The
+administrator-only, tenant-scoped backfill API requires a clean plan from a
+verified backup preview, verifies that the tenant is active from the server
+and rechecks it inside each Firestore transaction, and re-reads/recomputes
+each page before updating companions only. Transaction pages default to and
+are capped at 100 documents. It has not been run. These app-side checks are
+not a Rules authorization boundary. Legacy doubles
+remain authoritative for compatibility, Rules do not yet enforce integer
+arithmetic, and historical reconciliation, client rollout, and strict cutover
+remain unresolved. This is local implementation, not a production migration
+or release.
 
 Standalone cash-in/cash-out corrections use audited soft deletion only. The provider records the actor, reverses the exact shop-balance delta, and clears the cached latest-transaction summary when it points to the deleted row, all in the same batch. Workspace admins may perform this correction; sellers cannot delete transactions, hard deletion is denied, and invoice-linked transactions remain immutable outside invoice void/credit-note flows.
 

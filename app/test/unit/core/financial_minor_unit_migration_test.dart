@@ -109,6 +109,29 @@ void main() {
       );
     });
 
+    test('detects only a complete matching companion map', () {
+      const expected = {'amount': 1025};
+
+      expect(
+        FinancialMinorUnitMigration.hasCurrentCompanions(const {
+          'financial_minor_units': {'amount': 1025},
+        }, expected),
+        isTrue,
+      );
+      expect(
+        FinancialMinorUnitMigration.hasCurrentCompanions(const {
+          'financial_minor_units': {'amount': 1024},
+        }, expected),
+        isFalse,
+      );
+      expect(
+        FinancialMinorUnitMigration.hasCurrentCompanions(const {
+          'financial_minor_units': {'amount': 1025, 'extra': 0},
+        }, expected),
+        isFalse,
+      );
+    });
+
     test(
       'uses matching minor units and falls back for older-client writes',
       () {
@@ -200,6 +223,75 @@ void main() {
         transactionPlan.financialMinorUnits,
         containsPair('items.0.subtotal', 650),
       );
+    });
+
+    test('backfill requires a clean plan for the same tenant', () {
+      final cleanPlan = FinancialMinorUnitMigration.preview(
+        tenantId: 'tenant-a',
+        collections: {
+          'shops': [
+            {'__id': 'shop-1', 'tenant_id': 'tenant-a', 'balance': 4.25},
+          ],
+          'transactions': <Map<String, dynamic>>[],
+          'invoices': <Map<String, dynamic>>[],
+        },
+      );
+      final blockedPlan = FinancialMinorUnitMigration.preview(
+        tenantId: 'tenant-a',
+        collections: {
+          'shops': [
+            {'__id': 'shop-1', 'tenant_id': 'tenant-a', 'balance': 4.251},
+          ],
+          'transactions': <Map<String, dynamic>>[],
+          'invoices': <Map<String, dynamic>>[],
+        },
+      );
+
+      expect(
+        () => FinancialMinorUnitMigration.validateBackfillPlan(
+          plan: cleanPlan,
+          tenantId: 'tenant-a',
+        ),
+        returnsNormally,
+      );
+      expect(
+        () => FinancialMinorUnitMigration.validateBackfillPlan(
+          plan: cleanPlan,
+          tenantId: 'tenant-b',
+        ),
+        throwsStateError,
+      );
+      expect(
+        () => FinancialMinorUnitMigration.validateBackfillPlan(
+          plan: blockedPlan,
+          tenantId: 'tenant-a',
+        ),
+        throwsStateError,
+      );
+    });
+
+    test('requires an existing active tenant document for backfill', () {
+      expect(
+        () => FinancialMinorUnitMigration.validateActiveTenantDocument(
+          exists: true,
+          data: const {'active': true},
+        ),
+        returnsNormally,
+      );
+      for (final (exists, data) in [
+        (false, const <String, dynamic>{'active': true}),
+        (true, null),
+        (true, const <String, dynamic>{'active': false}),
+        (true, const <String, dynamic>{}),
+      ]) {
+        expect(
+          () => FinancialMinorUnitMigration.validateActiveTenantDocument(
+            exists: exists,
+            data: data,
+          ),
+          throwsStateError,
+        );
+      }
     });
 
     test(

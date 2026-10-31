@@ -33,6 +33,10 @@ const _kLastRestoreMs = 'backup_last_restore_ms';
 const _kLastRestoreBy = 'backup_last_restore_by';
 const _backupSecretStorage = FlutterSecureStorage();
 
+final databaseBackupFirestoreProvider = Provider<FirebaseFirestore>(
+  (ref) => FirebaseFirestore.instance,
+);
+
 // ─── Helper functions ────────────────────────────────────────────────────────
 
 /// P1-12 FIX: Derive per-tenant settings doc ID from user profile.
@@ -100,7 +104,7 @@ class DatabaseBackupNotifier extends Notifier<void> {
   @override
   void build() {}
 
-  FirebaseFirestore get _db => FirebaseFirestore.instance;
+  FirebaseFirestore get _db => ref.read(databaseBackupFirestoreProvider);
 
   // ─── Preferences ───────────────────────────────────────────────────────────
 
@@ -952,13 +956,15 @@ class DatabaseBackupNotifier extends Notifier<void> {
     );
   }
 
-  /// Backfills only integer companions. Financial major-unit fields are never
-  /// rewritten, so old clients remain authoritative during the compatibility
-  /// rollout. Do not invoke this until the workspace has been manually checked
-  /// for supported client versions.
-  Future<int> backfillFinancialMinorUnits({int pageSize = 100}) async {
-    if (pageSize <= 0 || pageSize > 400) {
-      throw ArgumentError.value(pageSize, 'pageSize', 'Use 1 through 400.');
+  /// Backfills one tenant's companions only after a clean verified backup
+  /// preview. Each document is re-read and recomputed transactionally; legacy
+  /// major-unit fields are never rewritten.
+  Future<int> backfillFinancialMinorUnits({
+    required FinancialMinorUnitMigrationPlan plan,
+    int pageSize = 100,
+  }) async {
+    if (pageSize <= 0 || pageSize > 100) {
+      throw ArgumentError.value(pageSize, 'pageSize', 'Use 1 through 100.');
     }
 
     final user = await ref.read(authUserProvider.future);
@@ -971,7 +977,21 @@ class DatabaseBackupNotifier extends Notifier<void> {
       );
     }
     final tenantId = TenantScope.requireTenant(user.tenantId);
+    FinancialMinorUnitMigration.validateBackfillPlan(
+      plan: plan,
+      tenantId: tenantId,
+    );
     final database = _db;
+    final tenantReference = database
+        .collection(Collections.tenants)
+        .doc(tenantId);
+    final tenantSnapshot = await tenantReference.get(
+      const GetOptions(source: Source.server),
+    );
+    FinancialMinorUnitMigration.validateActiveTenantDocument(
+      exists: tenantSnapshot.exists,
+      data: tenantSnapshot.data(),
+    );
     var updatedDocuments = 0;
 
     for (final collectionPath in const [
@@ -997,38 +1017,49 @@ class DatabaseBackupNotifier extends Notifier<void> {
         final page = await pageQuery.get();
         if (page.docs.isEmpty) break;
 
-        final batch = database.batch();
-        var pageWrites = 0;
-        for (final snapshot in page.docs) {
-          final data = snapshot.data();
-          if (data['tenant_id'] != tenantId) {
-            throw StateError(
-              'Financial backfill query returned a cross-workspace document',
-            );
-          }
-          final companions = FinancialMinorUnitMigration.companionsForBackfill(
-            migrationCollection,
-            data,
+        final pageWrites = await database.runTransaction<int>((
+          transaction,
+        ) async {
+          final currentTenant = await transaction.get(tenantReference);
+          FinancialMinorUnitMigration.validateActiveTenantDocument(
+            exists: currentTenant.exists,
+            data: currentTenant.data(),
           );
-          final existing = data[FinancialMinorUnitMigration.companionField];
-          final alreadyCurrent =
-              existing is Map &&
-              existing.length == companions.length &&
-              companions.entries.every(
-                (entry) =>
-                    existing[entry.key] is int &&
-                    existing[entry.key] == entry.value,
+          final currentDocuments = <DocumentSnapshot<Map<String, dynamic>>>[];
+          for (final snapshot in page.docs) {
+            currentDocuments.add(await transaction.get(snapshot.reference));
+          }
+
+          var writes = 0;
+          for (var index = 0; index < page.docs.length; index++) {
+            final current = currentDocuments[index];
+            final data = current.data();
+            if (!current.exists || data == null) continue;
+            if (data['tenant_id'] != tenantId) {
+              throw StateError(
+                'Financial backfill query returned a cross-workspace document',
               );
-          if (alreadyCurrent) continue;
-
-          batch.update(snapshot.reference, {
-            FinancialMinorUnitMigration.companionField: companions,
-          });
-          pageWrites++;
-        }
-
-        if (pageWrites > 0) await batch.commit();
+            }
+            final companions =
+                FinancialMinorUnitMigration.companionsForBackfill(
+                  migrationCollection,
+                  data,
+                );
+            if (FinancialMinorUnitMigration.hasCurrentCompanions(
+              data,
+              companions,
+            )) {
+              continue;
+            }
+            transaction.update(page.docs[index].reference, {
+              FinancialMinorUnitMigration.companionField: companions,
+            });
+            writes++;
+          }
+          return writes;
+        });
         updatedDocuments += pageWrites;
+
         if (page.docs.length < pageSize) break;
         lastDocument = page.docs.last;
       }

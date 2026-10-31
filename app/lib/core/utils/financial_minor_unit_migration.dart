@@ -164,6 +164,45 @@ class FinancialMinorUnitMigration {
     return Map<String, int>.from(updated[companionField] as Map);
   }
 
+  static bool hasCurrentCompanions(
+    Map<String, dynamic> document,
+    Map<String, int> expected,
+  ) {
+    final existing = document[companionField];
+    return existing is Map &&
+        existing.length == expected.length &&
+        expected.entries.every(
+          (entry) =>
+              existing[entry.key] is int && existing[entry.key] == entry.value,
+        );
+  }
+
+  static void validateBackfillPlan({
+    required FinancialMinorUnitMigrationPlan plan,
+    required String tenantId,
+  }) {
+    final normalizedTenantId = tenantId.trim();
+    if (normalizedTenantId.isEmpty || plan.tenantId != normalizedTenantId) {
+      throw StateError(
+        'Financial backfill requires a preview for the active workspace',
+      );
+    }
+    if (!plan.isClean) {
+      throw StateError(
+        'Financial backfill requires a clean verified backup preview',
+      );
+    }
+  }
+
+  static void validateActiveTenantDocument({
+    required bool exists,
+    required Map<String, dynamic>? data,
+  }) {
+    if (!exists || data?['active'] != true) {
+      throw StateError('workspace-disabled');
+    }
+  }
+
   static FinancialMinorUnitMigrationPlan preview({
     required String tenantId,
     required Map<String, dynamic> collections,

@@ -395,8 +395,11 @@ value; mismatches fall back to that legacy value. Provider writes keep both
 representations in the same atomic operation, and backup restore regenerates
 companions without changing existing financial values. The tenant-scoped
 backup preview and admin backfill API are implemented, but no production
-preview or backfill has been run. The backfill updates companions only and is
-paged at 100 documents by default, with a maximum page size of 400. Legacy
+preview or backfill has been run. Backfill requires a clean preview plan and
+checks the active tenant from the server and again inside each Firestore
+transaction before re-reading/recomputing documents and updating companions
+only. Transaction pages default to and are capped at 100 documents. These
+app-side checks are not a Firestore authorization boundary. Legacy
 doubles and Rules tolerances remain authoritative; exact integer arithmetic,
 historical reconciliation, compatible-client rollout, and strict Rules
 cutover remain unresolved and release-blocking.
